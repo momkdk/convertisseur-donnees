@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "convertisseur-donnees"
+version = "0.1.0"
+description = "Conversion CSV <-> JSON et validation de données contre un schéma simple (colonnes, types)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Mohamed Ali El Amri" }]
+keywords = ["csv", "json", "conversion", "validation", "données"]
+
+[project.scripts]
+convertisseur-donnees = "convertisseur_donnees.__main__:main"
+
+[tool.setuptools]
+packages = ["convertisseur_donnees"]
