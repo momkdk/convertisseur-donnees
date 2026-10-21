@@ -1,0 +1,6 @@
+{
+  "nom": "texte",
+  "age": "entier",
+  "actif": "booleen",
+  "inscrit_le": "date"
+}
