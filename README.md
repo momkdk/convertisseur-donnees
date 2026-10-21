@@ -1,5 +1,7 @@
 # convertisseur-donnees
 
+🔗 **Essayer en ligne, gratuitement : [momkdk.github.io/convertisseur-donnees](https://momkdk.github.io/convertisseur-donnees/)**
+
 Conversion **CSV ↔ JSON** et validation de données contre un schéma simple (colonnes
 obligatoires, types). Python pur, aucune dépendance, licence MIT. Outil généraliste :
 utile à n'importe quel métier qui manipule des tableurs et des fichiers de données.
