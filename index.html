@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Convertisseur CSV/JSON</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout : app deux colonnes — entrée à gauche, sortie/validation à droite, avec un bouton d'inversion du sens */
+:root{
+  --bg:#F3F6F8; --surface:#FFFFFF; --surface-2:#EAF0F4; --ink:#13233B; --muted:#5A6B82;
+  --line:#D7E0E8; --accent:#2F7A52; --accent-ink:#FFFFFF;
+  --ok:#2F8F5F; --warn:#B9790E; --danger:#C0392B;
+  --display:'Barlow Condensed',sans-serif; --body:'Public Sans',sans-serif; --mono:'IBM Plex Mono',monospace;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1A2B; --surface:#152439; --surface-2:#1C3049; --ink:#E7ECF2; --muted:#93A4BA;
+    --line:#2A3E57; --accent:#56C68C; --accent-ink:#0E1A2B;
+    --ok:#4FBE82; --warn:#E3A73B; --danger:#E0564A; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1A2B; --surface:#152439; --surface-2:#1C3049; --ink:#E7ECF2; --muted:#93A4BA;
+  --line:#2A3E57; --accent:#56C68C; --accent-ink:#0E1A2B;
+  --ok:#4FBE82; --warn:#E3A73B; --danger:#E0564A; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);margin:0;line-height:1.45}
+.wrap{max-width:1020px;margin:0 auto;padding:28px max(16px,env(safe-area-inset-left,0px)) 64px max(16px,env(safe-area-inset-right,0px))}
+.mark{font-family:var(--mono);font-size:12px;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:2px 6px;letter-spacing:.04em}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(28px,5vw,40px);margin:8px 0 4px;text-wrap:balance}
+.subtitle{color:var(--muted);font-size:15px;max-width:64ch}
+.tabs{display:flex;gap:8px;margin:20px 0 14px;flex-wrap:wrap}
+.tab{font-family:var(--display);font-weight:600;font-size:15px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px 16px;cursor:pointer;color:var(--muted)}
+.tab.active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.panel{display:none}
+.panel.active{display:block}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media (max-width:760px){.cols{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;min-width:0}
+.card h2{font-family:var(--display);font-weight:600;font-size:18px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+textarea{width:100%;min-height:220px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:var(--mono);font-size:12.5px;color:var(--ink);resize:vertical}
+.btn{background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:8px 14px;font-family:var(--body);font-weight:600;font-size:13px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.hint{font-size:12px;color:var(--muted);margin-top:8px}
+.msg{font-size:13px;margin-top:8px}
+.msg.err{color:var(--danger)}
+.msg.ok{color:var(--ok)}
+.schema-row{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center}
+.schema-row select,.schema-row input{background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:7px 8px;font-family:var(--mono);font-size:12.5px;color:var(--ink)}
+.schema-row button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1}
+ul.results{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:260px;overflow:auto}
+ul.results li{padding:7px 9px;border-radius:7px;background:var(--surface-2);font-size:12.5px}
+.summary{font-size:13px}
+footer{margin-top:34px;padding-top:16px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 18px}
+footer a{color:var(--accent);text-decoration:none}
+footer a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="mark">04 / 04</span>
+    <h1>Convertisseur CSV/JSON</h1>
+    <div class="subtitle">Conversion CSV ↔ JSON et validation de données contre un schéma simple — tout se passe dans votre navigateur.</div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="convertir" onclick="montrer('convertir')">Convertir</button>
+    <button class="tab" data-tab="valider" onclick="montrer('valider')">Valider</button>
+  </div>
+
+  <div class="panel active" id="panel-convertir">
+    <div class="cols">
+      <div class="card">
+        <h2>CSV <span style="font-size:12px;color:var(--muted);font-family:var(--mono)">entrée</span></h2>
+        <textarea id="csvIn" spellcheck="false">nom,age,actif,inscrit_le
+Alice Martin,34,oui,2024-03-12
+Bob Durand,41,non,2022-11-05</textarea>
+        <div class="row">
+          <button class="btn" onclick="csvVersJson()">→ Convertir en JSON</button>
+        </div>
+        <p class="hint">Séparateur , ou ; détecté automatiquement.</p>
+      </div>
+      <div class="card">
+        <h2>JSON <span style="font-size:12px;color:var(--muted);font-family:var(--mono)">sortie</span></h2>
+        <textarea id="jsonOut" spellcheck="false" readonly></textarea>
+        <div class="row">
+          <button class="btn ghost" onclick="copier('jsonOut')">Copier</button>
+          <button class="btn ghost" onclick="jsonVersCsv()">← Reconvertir en CSV</button>
+        </div>
+        <div class="msg" id="convMsg"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-valider">
+    <div class="cols">
+      <div class="card">
+        <h2>CSV à valider</h2>
+        <textarea id="csvValid" spellcheck="false">nom,age,actif,inscrit_le
+Alice Martin,34,oui,2024-03-12
+Bob Durand,41,non,2022-11-05
+Chloé Petit,trente,oui,2026-01-15</textarea>
+      </div>
+      <div class="card">
+        <h2>Schéma</h2>
+        <div id="schemaRows"></div>
+        <div class="row">
+          <button class="btn ghost" onclick="ajouterLigneSchema()">+ colonne</button>
+          <button class="btn" onclick="valider()">Valider</button>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:18px">
+      <h2>Résultat</h2>
+      <div class="summary" id="validSummary"></div>
+      <ul class="results" id="validResults"></ul>
+    </div>
+  </div>
+
+  <footer>
+    <span>Mohamed-Ali El Amri — développeur freelance Python &amp; IA, Cluses (Haute-Savoie)</span>
+    <a href="https://github.com/momkdk/convertisseur-donnees" target="_blank" rel="noopener">Code source (MIT)</a>
+    <a href="https://github.com/momkdk" target="_blank" rel="noopener">Tous les outils</a>
+  </footer>
+</div>
+
+<script>
+function el(id){return document.getElementById(id)}
+
+function montrer(nom){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===nom));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  el('panel-'+nom).classList.add('active');
+}
+
+function lireCsv(texte){
+  const lignes=texte.split(/\r?\n/).filter(l=>l.trim()!=='');
+  if(!lignes.length) throw new Error("fichier CSV vide ou sans en-tête");
+  const delim = (lignes[0].match(/;/g)||[]).length > (lignes[0].match(/,/g)||[]).length ? ';' : ',';
+  const entetes=lignes[0].split(delim).map(h=>h.trim());
+  return lignes.slice(1).map(l=>{
+    const valeurs=l.split(delim);
+    const obj={};
+    entetes.forEach((h,i)=>obj[h]=(valeurs[i]??'').trim());
+    return obj;
+  });
+}
+
+function ecrireCsv(objets){
+  if(!objets.length) throw new Error("aucune ligne à écrire");
+  const colonnes=[]; objets.forEach(o=>Object.keys(o).forEach(k=>{if(!colonnes.includes(k))colonnes.push(k)}));
+  const lignes=[colonnes.join(',')];
+  objets.forEach(o=>lignes.push(colonnes.map(c=>o[c]??'').join(',')));
+  return lignes.join('\n');
+}
+
+function csvVersJson(){
+  try{
+    const objets=lireCsv(el('csvIn').value);
+    el('jsonOut').value=JSON.stringify(objets, null, 2);
+    el('convMsg').className='msg ok'; el('convMsg').textContent=`${objets.length} ligne(s) converties.`;
+  }catch(e){ el('convMsg').className='msg err'; el('convMsg').textContent='Erreur : '+e.message; }
+}
+
+function jsonVersCsv(){
+  try{
+    const donnees=JSON.parse(el('jsonOut').value);
+    if(!Array.isArray(donnees)) throw new Error("le JSON doit être une liste d'objets");
+    el('csvIn').value=ecrireCsv(donnees);
+    el('convMsg').className='msg ok'; el('convMsg').textContent=`${donnees.length} ligne(s) reconverties en CSV.`;
+  }catch(e){ el('convMsg').className='msg err'; el('convMsg').textContent='Erreur : '+e.message; }
+}
+
+async function copier(id){
+  try{ await navigator.clipboard.writeText(el(id).value); }
+  catch(e){ el(id).select(); }
+}
+
+const TYPES=['texte','entier','decimal','booleen','date'];
+function ajouterLigneSchema(nom='', type='texte'){
+  const div=document.createElement('div'); div.className='schema-row';
+  div.innerHTML=`<input type="text" placeholder="colonne" value="${nom}">
+    <select>${TYPES.map(t=>`<option ${t===type?'selected':''}>${t}</option>`).join('')}</select>
+    <button onclick="this.parentElement.remove()" title="supprimer">×</button>`;
+  el('schemaRows').appendChild(div);
+}
+['nom:texte','age:entier','actif:booleen','inscrit_le:date'].forEach(p=>{const [n,t]=p.split(':'); ajouterLigneSchema(n,t)});
+
+const VRAI=new Set(['1','true','vrai','oui','yes']), FAUX=new Set(['0','false','faux','non','no']);
+function verifierType(valeur, type){
+  if(type==='texte') return null;
+  if(type==='entier') return /^-?\d+$/.test(valeur.trim()) ? null : `'${valeur}' n'est pas un entier`;
+  if(type==='decimal') return isFinite(parseFloat(valeur.replace(',','.'))) && /^-?[\d.,]+$/.test(valeur.trim()) ? null : `'${valeur}' n'est pas un nombre décimal`;
+  if(type==='booleen') return (VRAI.has(valeur.trim().toLowerCase())||FAUX.has(valeur.trim().toLowerCase())) ? null : `'${valeur}' n'est pas un booléen reconnu`;
+  if(type==='date') return /^\d{4}-\d{2}-\d{2}$/.test(valeur.trim()) ? null : `'${valeur}' n'est pas une date AAAA-MM-JJ`;
+}
+
+function valider(){
+  let schema={};
+  document.querySelectorAll('#schemaRows .schema-row').forEach(row=>{
+    const nom=row.querySelector('input').value.trim();
+    const type=row.querySelector('select').value;
+    if(nom) schema[nom]=type;
+  });
+  let lignes;
+  try{ lignes=lireCsv(el('csvValid').value); }
+  catch(e){ el('validSummary').innerHTML=`<span style="color:var(--danger)">Erreur : ${e.message}</span>`; el('validResults').innerHTML=''; return; }
+
+  const erreurs=[];
+  lignes.forEach((ligne,i)=>{
+    Object.keys(schema).forEach(col=>{
+      const v=ligne[col];
+      if(v===undefined || v.trim()===''){ erreurs.push({i,col,msg:'valeur manquante'}); return; }
+      const m=verifierType(v, schema[col]);
+      if(m) erreurs.push({i,col,msg:m});
+    });
+  });
+
+  el('validSummary').innerHTML = `${lignes.length} ligne(s) analysée(s), <span style="color:${erreurs.length?'var(--danger)':'var(--ok)'}">${erreurs.length} erreur(s)</span>`;
+  el('validResults').innerHTML = erreurs.length
+    ? erreurs.map(e=>`<li>ligne ${e.i+1} — colonne <strong>${e.col}</strong> : ${e.msg}</li>`).join('')
+    : '<li style="color:var(--ok)">Toutes les lignes respectent le schéma.</li>';
+}
+
+csvVersJson();
+</script>
+</body>
+</html>
